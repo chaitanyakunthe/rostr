@@ -21,7 +21,7 @@ pip install rostr
 Clone the repository and install the dependencies:
 
 ```bash
-git clone https://github.com/yourusername/project-name.git
+git clone https://github.com/chaitanyakunthe/rostr.git
 cd project-name
 poetry install
 ```
