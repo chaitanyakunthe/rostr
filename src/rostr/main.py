@@ -148,7 +148,7 @@ def delete(email: str):
 def list_roster(
     skill: Optional[str] = typer.Option(None, "--skill", "-s", help="Filter by a specific skill (e.g., Python)"),
     search: Optional[str] = typer.Option(None, "--search", "-q", help="Search in emails, names, and skills")
-):
+    ):
     """Display all people, with optional filtering by skill or general search."""
     people = load_people()
 
