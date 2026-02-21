@@ -1,3 +1,6 @@
+# --- Local Data ---
+data/
+scratch.py
 # --- Python / Poetry ---
 __pycache__/
 *.py[cod]
