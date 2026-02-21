@@ -1,0 +1,22 @@
+# --- Python / Poetry ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.pytest_cache/
+dist/
+build/
+.poetry/
+
+# --- Zed / IDEs ---
+.zed/
+.vscode/
+.idea/
+
+# --- System ---
+.DS_Store
+Thumbs.db
+
+# --- Env / Secrets ---
+.env
+.env.*
