@@ -203,6 +203,26 @@ def list_roster(
 # PROJECT COMMANDS (Note: @project_app.command)
 # ==========================================
 
+# Project Helper Functions
+def get_remaining_capacity(email: str, people: dict, projects: dict) -> int:
+    """Calculate a person's remaining available hours across all projects."""
+    if email not in people:
+        return 0
+
+    total_capacity = people[email]["capacity"]
+    used_capacity = 0
+
+    for proj_data in projects.values():
+        allocations = proj_data.get("allocated_people", {})
+        # Backward compatibility in case you still have old list data
+        if isinstance(allocations, list):
+            continue
+
+        # Add the hours if the person is in this project's allocations
+        used_capacity += allocations.get(email, 0)
+
+    return total_capacity - used_capacity
+
 @project_app.command(name="add")
 def add_project():
     """Add a new project with required skills using a guided wizard."""
@@ -412,6 +432,81 @@ def list_projects(
         )
 
     console.print(table)
+
+@project_app.command(name="allocate")
+def allocate_person():
+    """Allocate a consultant to a project with specific hours."""
+    projects = load_projects()
+    people = load_people()
+
+    if not projects or not people:
+        typer.secho("⚠️ Ensure you have both people and projects created first!", fg="yellow")
+        raise typer.Exit()
+
+    project_id = typer.prompt("Enter the Project ID to staff")
+    if project_id not in projects:
+        typer.secho(f"❌ Error: Project '{project_id}' does not exist.", fg="red", bold=True)
+        raise typer.Exit(code=1)
+
+    project = projects[project_id]
+
+    # Handle data migration from List to Dict seamlessly
+    allocations = project.get("allocated_people", {})
+    if isinstance(allocations, list):
+        allocations = {email: 0 for email in allocations}
+
+    typer.echo(f"\n--- Staffing: {project['name']} ---")
+    req_skills = project.get("required_skills", [])
+    if req_skills:
+        typer.secho(f"Project needs: {', '.join(req_skills)}\n", fg="cyan")
+
+    # Display Roster with Remaining Capacity
+    table = Table(show_header=True, header_style="bold magenta")
+    table.add_column("Email", style="cyan")
+    table.add_column("Name", style="white")
+    table.add_column("Avail/Total", style="green") # Updated column
+    table.add_column("Skills", style="blue")
+
+    for email, data in people.items():
+        skills_raw = data.get("skill", [])
+        formatted_skills = ", ".join([s.split(":")[0] for s in skills_raw])
+
+        # Calculate real-time availability
+        remaining = get_remaining_capacity(email, people, projects)
+        status = "⭐" if email in allocations else ""
+
+        table.add_row(
+            email,
+            f"{status} {data['name']}",
+            f"{remaining}h / {data['capacity']}h", # Shows 15h / 40h
+            formatted_skills if formatted_skills else "None"
+        )
+
+    console.print(table)
+
+    email_to_allocate = typer.prompt("\nEnter the Email of the person to allocate")
+    if email_to_allocate not in people:
+        typer.secho("❌ Error: Email not found.", fg="red")
+        raise typer.Exit(code=1)
+
+    # Ask for hours to allocate
+    remaining = get_remaining_capacity(email_to_allocate, people, projects)
+    person_name = people[email_to_allocate]["name"]
+
+    typer.secho(f"\n{person_name} has {remaining} hours available.", fg="cyan")
+    hours = typer.prompt(f"How many hours per week to allocate to '{project['name']}'?", type=int)
+
+    # Validate Capacity
+    if hours > remaining:
+        typer.secho(f"❌ Error: Cannot allocate {hours}h. {person_name} only has {remaining}h available!", fg="red", bold=True)
+        raise typer.Exit(code=1)
+
+    # Save the allocation dictionary
+    allocations[email_to_allocate] = hours
+    projects[project_id]["allocated_people"] = allocations
+    save_projects(projects)
+
+    typer.secho(f"\n✅ Successfully allocated {person_name} for {hours}h/wk to {project['name']}!", fg="green", bold=True)
 
 if __name__ == "__main__":
     app()
