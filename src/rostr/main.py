@@ -65,28 +65,6 @@ def prompt_for_date(prompt_text: str, allow_empty: bool = False) -> str:
         except ValueError:
             typer.secho("⚠️ Invalid format. Please use YYYY-MM-DD (e.g., 2024-10-31).", fg="yellow")
 
-def load_people() -> dict:
-    try:
-        with PEOPLE.open() as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
-
-def save_people(people: dict):
-    with PEOPLE.open("w") as f:
-        json.dump(people, f, indent=2)
-
-def load_projects() -> dict:
-    try:
-        with PROJECTS.open() as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
-
-def save_projects(projects: dict):
-    with PROJECTS.open("w") as f:
-        json.dump(projects, f, indent=2)
-
 
 # ==========================================
 # PEOPLE COMMANDS (Note: @people_app.command)
