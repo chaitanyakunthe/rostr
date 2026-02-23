@@ -3,11 +3,9 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-# --- 1. FILE SETUP ---
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-DATA_DIR = BASE_DIR / "data"
-
-# Ensure the data directory exists
+# --- FILE SETUP ---
+# Save data to the user's home directory so it's globally accessible and safe
+DATA_DIR = Path.home() / ".rostr"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # Define our file paths
@@ -16,7 +14,7 @@ PEOPLE_FILE = DATA_DIR / "rostr_people.json"
 PROJECTS_FILE = DATA_DIR / "rostr_projects.json"
 ALLOCATIONS_FILE = DATA_DIR / "rostr_allocations.json"
 
-# --- 2. THE WRITER (Append-Only) ---
+# --- THE WRITER (Append-Only) ---
 def append_event(event_type: str, payload: dict):
     """
     Appends a new event to the immutable ledger and immediately rebuilds the state.
@@ -36,7 +34,7 @@ def append_event(event_type: str, payload: dict):
     rebuild_state()
 
 
-# --- 3. THE REDUCER (Rebuilds current reality) ---
+# --- THE REDUCER (Rebuilds current reality) ---
 def rebuild_state():
     """
     Reads the entire journal from top to bottom and compiles the current state

@@ -1,30 +1,22 @@
-import sys
-import json
-from pathlib import Path
-from typing import Optional
 import re
-from datetime import datetime, timedelta
 import uuid
+from typing import Optional
+from datetime import datetime, timedelta
+from pathlib import Path
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
-# 1. Force Python to look in the exact same folder as main.py
-current_dir = Path(__file__).resolve().parent
-if str(current_dir) not in sys.path:
-    sys.path.append(str(current_dir))
+# Relative import for our local ledger module
+from .ledger import append_event, load_state, PEOPLE_FILE, PROJECTS_FILE, ALLOCATIONS_FILE
 
-# Import our new Ledger Engine! (noqa tells Ruff to ignore the import order here)
-from ledger import append_event, load_state, PEOPLE_FILE, PROJECTS_FILE, ALLOCATIONS_FILE  # noqa: E402
-
-# 1. Initialize the Main App and Sub-Apps
+# Initialize the Main App and Sub-Apps
 app = typer.Typer(help="Rostr: Resource and Project Management CLI")
 people_app = typer.Typer(help="Manage consultants and their skills")
 project_app = typer.Typer(help="Manage projects and resource allocation")
 report_app = typer.Typer(help="Generate utilization and allocation reports")
 
-# 2. Attach sub-apps to the main app
 app.add_typer(people_app, name="people")
 app.add_typer(project_app, name="project")
 app.add_typer(report_app, name="report")
@@ -690,7 +682,6 @@ def allocate_person(project_id: Optional[str] = typer.Argument(None)):
         raise typer.Exit(code=1)
 
     # --- 4. FIRE THE EVENT ---
-    import uuid
     allocation_id = uuid.uuid4().hex[:8]
 
     payload = {
@@ -754,69 +745,11 @@ def report_current():
     today = datetime.now().date().isoformat()
 
     table = Table(title=f"Current Utilization (As of {today})", show_header=True, header_style="bold magenta")
-    table.add_column("Name", style="cyan")
+    table.add_column("Name", style="cyan", no_wrap=True)
     table.add_column("Capacity", justify="right")
     table.add_column("Allocated", justify="right")
-    table.add_column("Utilization", justify="right")
-    table.add_column("Active Projects", style="dim")
-
-    for email, person_data in people.items():
-        if not person_data.get("is_active", True): continue
-
-        base_capacity = person_data.get("capacity", 40)
-        if base_capacity == 0: continue # Prevent division by zero
-
-        allocated_hours = 0
-        active_proj_names = []
-
-        # Find all allocations for this person happening TODAY
-        for alloc_id, alloc_data in allocations.items():
-            if alloc_data["email"] == email:
-                start = alloc_data["start_date"]
-                end = alloc_data.get("end_date", "2099-12-31") # Fallback if no end date
-
-                # Check if today falls within the allocation window
-                if start <= today <= end:
-                    proj_id = alloc_data["project_id"]
-                    proj_status = projects.get(proj_id, {}).get("status", "Unknown")
-
-                    # Only count Active or Proposed projects
-                    if proj_status not in ["Deleted", "Lost", "Completed"]:
-                        allocated_hours += alloc_data["hours"]
-                        active_proj_names.append(projects[proj_id]["name"])
-
-        utilization_pct = (allocated_hours / base_capacity) * 100
-        color = get_utilization_color(utilization_pct)
-
-        table.add_row(
-            person_data["name"],
-            f"{base_capacity}h",
-            f"{allocated_hours}h",
-            f"[{color}]{utilization_pct:.1f}%[/{color}]",
-            ", ".join(active_proj_names) if active_proj_names else "Bench / Available"
-        )
-
-    console.print(table)
-
-@report_app.command(name="forecast")
-def report_forecast(
-    target_date: str = typer.Option(None, "--date", "-d", help="YYYY-MM-DD to forecast for (defaults to +30 days)")
-    ):
-    """Report: Predicted utilization applying pipeline probability."""
-    people = load_state(PEOPLE_FILE)
-    projects = load_state(PROJECTS_FILE)
-    allocations = load_state(ALLOCATIONS_FILE)
-
-    # Default to 30 days in the future if no date is provided
-    if not target_date:
-        target_date = (datetime.now() + timedelta(days=30)).date().isoformat()
-        typer.secho(f"🤖 No date provided. Defaulting to 30-day forecast: {target_date}\n", fg="cyan", italic=True)
-
-    table = Table(title=f"Predicted Utilization (Forecast for {target_date})", show_header=True, header_style="bold magenta")
-    table.add_column("Name", style="cyan")
-    table.add_column("Capacity", justify="right")
-    table.add_column("Expected Hrs", justify="right")
-    table.add_column("Predicted Util.", justify="right")
+    table.add_column("Total Util.", justify="right")
+    table.add_column("Project Breakdown", style="white") # Renamed and styled for better readability
 
     for email, person_data in people.items():
         if not person_data.get("is_active", True): continue
@@ -824,37 +757,166 @@ def report_forecast(
         base_capacity = person_data.get("capacity", 40)
         if base_capacity == 0: continue
 
-        expected_hours = 0.0
+        total_allocated_hours = 0
+        project_breakdown_lines = []
 
+        # Find all allocations for this person happening TODAY
         for alloc_id, alloc_data in allocations.items():
             if alloc_data["email"] == email:
                 start = alloc_data["start_date"]
                 end = alloc_data.get("end_date", "2099-12-31")
 
-                # Check if the TARGET DATE falls within the allocation window
-                if start <= target_date <= end:
+                if start <= today <= end:
                     proj_id = alloc_data["project_id"]
-                    project = projects.get(proj_id, {})
-                    proj_status = project.get("status", "Unknown")
+                    proj_status = projects.get(proj_id, {}).get("status", "Unknown")
 
                     if proj_status not in ["Deleted", "Lost", "Completed"]:
-                        # THE MAGIC MATH: Apply the probability!
-                        probability = project.get("probability", 100)
-                        weighted_hours = alloc_data["hours"] * (probability / 100.0)
-                        expected_hours += weighted_hours
+                        hours = alloc_data["hours"]
+                        total_allocated_hours += hours
 
-        utilization_pct = (expected_hours / base_capacity) * 100
+                        proj_name = projects[proj_id]["name"]
+                        proj_util_pct = (hours / base_capacity) * 100
+
+                        # Add a formatted line specifically for this project
+                        project_breakdown_lines.append(f"• {proj_name}: {hours}h ([dim]{proj_util_pct:.0f}%[/dim])")
+
+        utilization_pct = (total_allocated_hours / base_capacity) * 100
         color = get_utilization_color(utilization_pct)
+
+        # Join the breakdown lines with a newline character, or show "Bench"
+        breakdown_text = "\n".join(project_breakdown_lines) if project_breakdown_lines else "[dim italic]Bench / Available[/dim italic]"
 
         table.add_row(
             person_data["name"],
             f"{base_capacity}h",
-            f"{expected_hours:.1f}h",
-            f"[{color}]{utilization_pct:.1f}%[/{color}]"
+            f"{total_allocated_hours}h",
+            f"[{color}]{utilization_pct:.0f}%[/{color}]",
+            breakdown_text
         )
 
+        # Optional: Add a subtle divider between rows if they are multi-line for cleaner reading
+        table.add_section()
+
     console.print(table)
-    typer.secho("\nNote: Expected Hrs are calculated as (Allocated Hours * Project Probability).", dim=True)
+
+@report_app.command(name="forecast")
+def report_forecast(
+    months: int = typer.Option(3, "--months", "-m", help="Number of months to forecast into the future"),
+    view: str = typer.Option("all", "--view", "-v", help="Filter projects: 'all', 'active' (certain), or 'probable' (pipeline)")
+    ):
+    """Report: Multi-month predicted utilization with project breakdown and context-aware filtering."""
+    people = load_state(PEOPLE_FILE)
+    projects = load_state(PROJECTS_FILE)
+    allocations = load_state(ALLOCATIONS_FILE)
+
+    view = view.lower()
+    if view not in ["all", "active", "probable"]:
+        typer.secho("❌ Error: View must be 'all', 'active', or 'probable'.", fg="red")
+        raise typer.Exit(code=1)
+
+    time_buckets = []
+    current_date = datetime.now().date()
+    curr_year = current_date.year
+    curr_month = current_date.month
+
+    for _ in range(months):
+        curr_month += 1
+        if curr_month > 12:
+            curr_month = 1
+            curr_year += 1
+
+        target_date = datetime(curr_year, curr_month, 15).date()
+        label = target_date.strftime("%b %Y")
+        time_buckets.append({"label": label, "date": target_date.isoformat()})
+
+    title_suffix = ""
+    if view == "active": title_suffix = " [ACTIVE/CERTAIN ONLY]"
+    elif view == "probable": title_suffix = " [PIPELINE/PROBABLE ONLY]"
+
+    table = Table(
+        title=f"Pipeline Forecast ({months} Months){title_suffix}",
+        show_header=True,
+        header_style="bold magenta"
+    )
+    table.add_column("Name", style="cyan", no_wrap=True)
+    table.add_column("Cap.", justify="right", style="dim")
+
+    for bucket in time_buckets:
+        table.add_column(bucket["label"])
+
+    for email, person_data in people.items():
+        if not person_data.get("is_active", True): continue
+
+        base_capacity = person_data.get("capacity", 40)
+        if base_capacity == 0: continue
+
+        row_data = [person_data["name"], f"{base_capacity}h"]
+
+        for bucket in time_buckets:
+            target_str = bucket["date"]
+
+            # Track both types of hours simultaneously
+            active_hours = 0.0
+            probable_hours = 0.0
+            breakdown_lines = []
+
+            for alloc_id, alloc_data in allocations.items():
+                if alloc_data["email"] == email:
+                    start = alloc_data["start_date"]
+                    end = alloc_data.get("end_date", "2099-12-31")
+
+                    if start <= target_str <= end:
+                        proj_id = alloc_data["project_id"]
+                        project = projects.get(proj_id, {})
+                        status = project.get("status", "Unknown").lower()
+
+                        if status not in ["deleted", "lost", "completed"]:
+                            prob = project.get("probability", 100)
+                            is_probable = (status == "proposed" or prob < 100)
+
+                            weighted_hrs = alloc_data["hours"] * (prob / 100.0)
+                            p_name = project.get("name", proj_id)
+
+                            # Sort the hours into their respective buckets
+                            if is_probable:
+                                probable_hours += weighted_hrs
+                                if view in ["all", "probable"]:
+                                    breakdown_lines.append(f"[cyan]• {p_name}: {weighted_hrs:.1f}h ([italic]{prob}% prob[/italic])[/cyan]")
+                            else:
+                                active_hours += weighted_hrs
+                                if view in ["all", "active"]:
+                                    breakdown_lines.append(f"• {p_name}: {weighted_hrs:.1f}h")
+
+            # Determine which hours to use for the main calculation based on the view
+            if view == "all":
+                expected_hours = active_hours + probable_hours
+            elif view == "active":
+                expected_hours = active_hours
+            else: # view == "probable"
+                expected_hours = probable_hours
+
+            util_pct = (expected_hours / base_capacity) * 100
+            color = get_utilization_color(util_pct)
+
+            # SMART ZERO-STATES: Explain WHY it's zero
+            if expected_hours == 0:
+                if view == "probable" and active_hours > 0:
+                    cell_text = f"[dim]0h Pipeline\n({active_hours:.1f}h Active)[/dim]"
+                elif view == "active" and probable_hours > 0:
+                    cell_text = f"[dim]0h Active\n({probable_hours:.1f}h Pipeline)[/dim]"
+                else:
+                    cell_text = "[dim italic]Bench[/dim italic]"
+            else:
+                summary_header = f"[{color}][bold]{util_pct:.0f}%[/bold] ({expected_hours:.1f}h)[/{color}]"
+                details = "\n".join(breakdown_lines)
+                cell_text = f"{summary_header}\n{details}"
+
+            row_data.append(cell_text)
+
+        table.add_row(*row_data)
+        table.add_section()
+
+    console.print(table)
 
 @report_app.command(name="timeline")
 def report_timeline(

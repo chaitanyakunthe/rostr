@@ -1,12 +1,12 @@
 [project]
 name = "rostr"
-version = "0.1.0"
-description = ""
+version = "0.1.1"
+description = "A powerful CLI for Resource Planning and Professional Services Automation."
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.10"
 license = "MIT"
 authors = [{ name = "CK", email = "ckunthe@gmail.com" }]
-dependencies = ["typer (>=0.24.0,<0.25.0)"]
+dependencies = ["rich (>=13.0.0)", "typer (>=0.24.0,<0.25.0)"]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
