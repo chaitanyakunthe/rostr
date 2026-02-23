@@ -155,7 +155,7 @@ def delete_person(email: str):
 def list_roster(
     skill: Optional[str] = typer.Option(None, "--skill", "-s", help="Filter by a specific skill (e.g., Python)"),
     search: Optional[str] = typer.Option(None, "--search", "-q", help="Search in emails, names, and skills")
-):
+    ):
     """Display all people, with optional filtering by skill or general search."""
     people = load_people()
     if not people:
@@ -198,12 +198,12 @@ def list_roster(
 
     console.print(table)
 
-
 # ==========================================
 # PROJECT COMMANDS (Note: @project_app.command)
 # ==========================================
 
 # Project Helper Functions
+
 def get_remaining_capacity(email: str, people: dict, projects: dict) -> int:
     """Calculate a person's remaining available hours across all projects."""
     if email not in people:
