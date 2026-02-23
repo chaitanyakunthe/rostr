@@ -1,6 +1,7 @@
 # --- Local Data ---
 data/
 scratch.py
+.rostr/
 # --- Python / Poetry ---
 __pycache__/
 *.py[cod]

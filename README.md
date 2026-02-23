@@ -114,6 +114,14 @@ Rostr uses a local, privacy-first storage model. No databases to spin up, and no
 
 > If you ever want to back up your roster or share it with a colleague, simply copy the `~/.rostr/rostr_journal.jsonl`  file!
 
+### ⚠️ CRITICAL WARNING: THE EVENT JOURNAL
+Rostr relies on an **Event-Sourced Architecture**. This means the `rostr_journal.jsonl` file is the absolute brain and single source of truth for your entire application. 
+
+* **✅ SAFE TO DELETE:** `rostr_people.json`, `rostr_projects.json`, and `rostr_allocations.json`. If you delete these, Rostr will automatically and perfectly rebuild them from the journal the next time you run a command.
+* **❌ DO NOT DELETE:** `rostr_journal.jsonl`. If you delete or manually corrupt this file, **all of your data will be permanently wiped out** the next time you add a person or project. 
+
+**Backups:** Because of this architecture, `rostr_journal.jsonl` is the *only* file you need to back up. If you move to a new computer, just install Rostr, drop your old journal file into the `~/.rostr/` folder, and the app will instantly rebuild your entire workspace.
+
 ## 🤝 Contributing
 
 Contributions are welcome! If you have ideas for new reports, commands, or features:
