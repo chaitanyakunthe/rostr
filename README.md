@@ -1,4 +1,4 @@
-# Rostr
+# rostr
 
 [![PyPI version](https://img.shields.io/pypi/v/rostr.svg)](https://pypi.org/project/rostr/)
 [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)

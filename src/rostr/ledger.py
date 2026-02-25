@@ -20,7 +20,7 @@ def append_event(event_type: str, payload: dict):
     Appends a new event to the immutable ledger and immediately rebuilds the state.
     """
     event = {
-        "event_id": str(uuid.uuid4()), # Unique ID for every action
+        "event_id": str(uuid.uuid4()),
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "event_type": event_type,
         "payload": payload
@@ -45,7 +45,6 @@ def rebuild_state():
     state_projects = {}
     state_allocations = {}
 
-    # If no journal exists yet, just save the empty states and return
     if not JOURNAL_FILE.exists():
         _save_state(PEOPLE_FILE, state_people)
         _save_state(PROJECTS_FILE, state_projects)
@@ -56,7 +55,7 @@ def rebuild_state():
     with JOURNAL_FILE.open("r") as f:
         for line in f:
             if not line.strip():
-                continue # Skip empty lines
+                continue
 
             event = json.loads(line)
             e_type = event["event_type"]
@@ -70,20 +69,22 @@ def rebuild_state():
                     state_people[data["email"]].update(data)
             elif e_type == "PERSON_DELETED":
                 if data["email"] in state_people:
-                    state_people[data["email"]]["is_active"] = False # We deactivate, not delete!
+                    state_people[data["email"]]["is_active"] = False
             elif e_type == "PERSON_OFFBOARDED":
                 if data["email"] in state_people:
                     state_people[data["email"]]["exit_date"] = data["exit_date"]
-                elif e_type == "UNAVAILABILITY_ADDED":
-                    email = data["email"]
-                    if email in state_people:
-                        if "unavailability" not in state_people[email]:
-                            state_people[email]["unavailability"] = []
-                        state_people[email]["unavailability"].append({
-                            "start_date": data["start_date"],
-                            "end_date": data["end_date"],
-                            "reason": data.get("reason", "PTO")
-                        })
+
+            # FIXED: Unavailability is now its own event type, not nested in offboard
+            elif e_type == "UNAVAILABILITY_ADDED":
+                email = data["email"]
+                if email in state_people:
+                    if "unavailability" not in state_people[email]:
+                        state_people[email]["unavailability"] = []
+                    state_people[email]["unavailability"].append({
+                        "start_date": data["start_date"],
+                        "end_date": data["end_date"],
+                        "reason": data.get("reason", "PTO")
+                    })
 
             # --- APPLY PROJECT EVENTS ---
             elif e_type == "PROJECT_ADDED":
@@ -110,14 +111,12 @@ def rebuild_state():
     _save_state(ALLOCATIONS_FILE, state_allocations)
 
 
-# --- 4. HELPER FUNCTIONS ---
+# --- HELPER FUNCTIONS ---
 def _save_state(filepath: Path, data: dict):
-    """Helper to save a dictionary to a JSON file cleanly."""
     with filepath.open("w") as f:
         json.dump(data, f, indent=2)
 
 def load_state(filepath: Path) -> dict:
-    """Helper for the CLI to instantly read the compiled state."""
     try:
         with filepath.open("r") as f:
             return json.load(f)
