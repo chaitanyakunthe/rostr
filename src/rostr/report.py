@@ -2,6 +2,7 @@ import typer
 from datetime import datetime, timedelta
 from rich.table import Table
 
+from .config import load_config
 from .ledger import load_state, PEOPLE_FILE, PROJECTS_FILE, ALLOCATIONS_FILE
 from .utils import console, get_utilization_color, calculate_utilization_at_date
 
@@ -34,7 +35,9 @@ def report_current():
     console.print(table)
 
 @report_app.command(name="forecast")
-def report_forecast(months: int = typer.Option(3, "--months", "-m", help="Months to predict")):
+def report_forecast(months: int = typer.Option(None, "--months", "-m")):
+    cfg = load_config()
+    months = months or cfg["forecast_months"]
     people, projects, allocs = load_state(PEOPLE_FILE), load_state(PROJECTS_FILE), load_state(ALLOCATIONS_FILE)
 
     buckets = []

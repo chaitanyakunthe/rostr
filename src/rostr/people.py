@@ -2,6 +2,7 @@ import typer
 from typing import Optional
 from datetime import datetime
 from rich.table import Table
+from .config import load_config
 
 from .ledger import append_event, load_state, PEOPLE_FILE
 from .utils import console, calculate_dynamic_experience, generate_short_code, prompt_for_date
@@ -10,6 +11,7 @@ people_app = typer.Typer(help="Manage consultants, skills, and availability")
 
 @people_app.command(name="add")
 def add_person():
+    cfg = load_config()
     people = load_state(PEOPLE_FILE)
     email = typer.prompt("Enter email address")
     if email in people and people[email].get("is_active", True):
@@ -21,7 +23,7 @@ def add_person():
     typer.secho(f"🤖 Auto-assigned Short Code: {short_code}", fg="cyan")
 
     designation = typer.prompt("Designation (e.g. Lead Engineer)")
-    capacity = typer.prompt("Weekly Hours Capacity", default=40, type=int)
+    capacity = typer.prompt("Weekly Hours Capacity", default=cfg["default_capacity"], type=int)
     experience = typer.prompt("Total Years of Experience (to date)", default=0.0, type=float)
 
     skills = []

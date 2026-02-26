@@ -3,6 +3,7 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 import typer
 from rich.console import Console
+from .config import load_config
 
 # Initialize a single console to be imported across all apps
 console = Console()
@@ -20,12 +21,15 @@ def calculate_dynamic_experience(stored_exp: float, update_date_str: Optional[st
         return stored_exp
 
 def generate_short_code(name: str, existing_people: Dict[str, Any]) -> str:
+    cfg = load_config()
+    code_len = cfg["person_shortcode_len"]
+
     existing_codes = {p.get("short_code", "").upper() for p in existing_people.values() if "short_code" in p}
     parts = name.strip().split()
     if not parts:
         base_code = "CONS"
     else:
-        first_part = parts[0][:4].capitalize()
+        first_part = parts[0][:code_len].capitalize()
         last_part = parts[-1][0].upper() if len(parts) > 1 else ""
         base_code = first_part + last_part
 
@@ -37,12 +41,15 @@ def generate_short_code(name: str, existing_people: Dict[str, Any]) -> str:
     return code
 
 def generate_project_short_code(name: str, existing_projects: Dict[str, Any]) -> str:
+    cfg = load_config()
+    code_len = cfg["project_shortcode_len"]
+
     existing_codes = {p.get("short_code", "").upper() for p in existing_projects.values() if "short_code" in p}
     parts = name.strip().split()
     if not parts:
         base_code = "PROJ"
     else:
-        first_part = parts[0][:6].capitalize()
+        first_part = parts[0][:code_len].capitalize()
         last_part = parts[-1][0].upper() if len(parts) > 1 else ""
         base_code = first_part + last_part
 
@@ -50,7 +57,7 @@ def generate_project_short_code(name: str, existing_projects: Dict[str, Any]) ->
     counter = 1
     while code.upper() in existing_codes:
         suffix = str(counter)
-        code = base_code[:8-len(suffix)] + suffix
+        code = base_code[:(code_len+2)-len(suffix)] + suffix
         counter += 1
     return code
 
@@ -64,20 +71,28 @@ def generate_project_id(name: str, existing_projects: Dict[str, Any]) -> str:
     return project_id
 
 def prompt_for_date(prompt_text: str, allow_empty: bool = False) -> str:
-    prompt_str = f"{prompt_text} (YYYY-MM-DD)"
+    cfg = load_config()
+    fmt = cfg["date_format"]
+    hint_map = {"%Y-%m-%d": "YYYY-MM-DD", "%d/%m/%Y": "DD/MM/YYYY", "%m/%d/%Y": "MM/DD/YYYY"}
+    hint = hint_map.get(fmt, "YYYY-MM-DD")
+
+    prompt_str = f"{prompt_text} ({hint})"
     if allow_empty:
         prompt_str += typer.style(" [Press Enter to skip]", fg=typer.colors.CYAN)
     while True:
         date_str = typer.prompt(prompt_str, default="", show_default=False).strip()
         if allow_empty and not date_str: return ""
         try:
-            return datetime.strptime(date_str, "%Y-%m-%d").date().isoformat()
+            # Parse using user's format, but ALWAYS return ISO-8601 for the ledger
+            return datetime.strptime(date_str, fmt).date().isoformat()
         except ValueError:
-            typer.secho("⚠️ Invalid format. Please use YYYY-MM-DD (e.g., 2025-12-31).", fg="yellow")
+            typer.secho(f"⚠️ Invalid format. Please use {hint}.", fg="yellow")
 
 def get_utilization_color(utilization_pct: float) -> str:
+    cfg = load_config()
+    target = cfg["utilization_target"]
     if utilization_pct > 100: return "red"
-    if utilization_pct >= 75: return "green"
+    if utilization_pct >= target: return "green"
     return "yellow"
 
 def calculate_utilization_at_date(email: str, target_date: str, people: dict, projects: dict, allocations: dict) -> float:
@@ -95,3 +110,13 @@ def calculate_utilization_at_date(email: str, target_date: str, people: dict, pr
                     prob = proj.get("probability", 100)
                     expected_hours += alloc["hours"] * (prob / 100.0)
     return (expected_hours / base_capacity) * 100
+
+    # Displaying dates in reports
+    def format_date_for_display(iso_date_str: str) -> str:
+        if not iso_date_str: return ""
+        cfg = load_config()
+        try:
+            dt = datetime.strptime(iso_date_str, "%Y-%m-%d").date()
+            return dt.strftime(cfg["date_format"])
+        except ValueError:
+            return iso_date_str
