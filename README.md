@@ -8,6 +8,14 @@
 
 Built with an **Event-Sourced architecture**, Rostr doesn't just store your current state—it maintains an immutable ledger of every staffing change you make. It provides instant, beautifully formatted terminal dashboards to help you forecast utilization, spot bottlenecks, and manage your pipeline.
 
+## 🔥 What's New in v0.2.0
+* **Interactive Setup Wizard:** Run `rostr setup` to personalize your workspace globally.
+* **Custom Date Formats:** Input and view dates your way—choose between `YYYY-MM-DD` (ISO), `DD/MM/YYYY` (EU/India), or `MM/DD/YYYY` (US).
+* **Workspace Defaults:** Set your region's default weekly capacity and custom forecast horizons.
+* **Smart Shortcodes:** Customize the auto-generated length of your team and project shortcodes to fit your organization's naming conventions.
+* **Modular Architecture:** Under-the-hood rewrite separating `people`, `project`, and `report` modules for faster execution and better scalability.
+
+
 ## ✨ Key Features
 * **Terminal-Native Dashboards:** Rich, color-coded heatmaps and matrix reports right in your terminal.
 * **Event-Sourced Ledger:** Every addition, allocation, and time-off request is stored as an immutable event.
@@ -22,11 +30,13 @@ Built with an **Event-Sourced architecture**, Rostr doesn't just store your curr
 Rostr is a globally available CLI tool. The recommended way to install it is using `pipx`, which keeps the tool and its dependencies safely isolated from your system Python.
 
 ### Option 1: Install via pipx (**Recommended**)
+
 ```bash
 pipx install rostr
 ```
 
 ### Option 2: Install via pip
+
 ```bash
 pip install rostr
 ```
@@ -34,6 +44,7 @@ pip install rostr
 ### Option 3: Install from Source (**For Development**)
 
 Clone the repository and install the dependencies using Poetry:
+
 ```bash
 git clone [https://github.com/chaitanyakunthe/rostr.git](https://github.com/chaitanyakunthe/rostr.git)
 cd rostr
@@ -41,12 +52,21 @@ poetry install
 ```
 ---
 ## 📖 Quick Start Guide
+
 Once installed, you can access the tool from anywhere on your computer simply by typing `rostr`.
 Here is the basic workflow to get your first report running.
 
-If you ever get stuck, `rostr --help` will help you.
+### 0. Setup
+
+On your very first run, Rostr will automatically launch a setup wizard. You can also trigger this manually at any time to change your date formats, default hours, and reporting targets.
+
+```bash
+rostr setup
+```
+If you ever get stuck, `rostr --help` will help you. For command specific help - `rostr <command> --help` and so on.
 
 ### 1. Build your team
+
 Add people to your roster and define their weekly capacity (default is 40 hours).
 
 ```bash
@@ -55,14 +75,23 @@ rostr people list
 ```
 
 ### 2. Log timeoffs and exits
-Ensure your forecasts are accurate by logging vacations or offboarding dates.
+
+Ensure your forecasts are accurate by changes and plotting timeoffs.
 
 ```bash
+rostr people edit
 rostr people timeoff
+```
+
+Remove people from your roster.
+
+```bash
 rostr people offboard
+rostr people delete
 ```
 
 ### 3. Create Projects
+
 Add projects to your pipeline. You can mark them as `Active`, `Proposed`, etc., and assign a win probability.
 
 ```bash
@@ -70,14 +99,17 @@ rostr project add
 rostr project list
 ```
 
-### 4. Allocate People to Projects
+### 4. Allocate People to Projects and remove them
+
 Assign your team to projects with start and end dates.
 
 ```bash
 rostr project allocate
+rostr project unallocate
 ```
 
 ## 📊 Reporting & Dashboards
+
 Rostr's true power lies in its reporting engine.
 
 #### Current Utilization
@@ -104,6 +136,19 @@ rostr report forecast --months 3
 rostr report forecast --view active
 # Filter to see ONLY proposed/pipeline work
 rostr report forecast --view probable
+```
+
+#### Know how is not available
+Generate a timeoff report to know unavailable dates
+
+```bash
+rostr report timeoff
+```
+
+#### Know your gaps in skill
+
+```bash
+rostr report skills
 ```
 
 ## 🗄️ Where is my data stored?
